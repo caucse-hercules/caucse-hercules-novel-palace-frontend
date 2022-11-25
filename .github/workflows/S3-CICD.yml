@@ -1,0 +1,44 @@
+name: S3-CICD
+
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+      
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+        
+      - name: Cache yarn node modules
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+            path: ${{steps.yarn-cache-dir-path.outputs.dir}}
+            key: ${{runner.os}}-yarn-${{hashFiles('**/yarn.lock')}}
+            restore-keys: |
+              ${{runner.os}}-yarn-
+        
+      - name: Install Dependencies
+        run: yarn
+      
+      - name: Build
+        run: yarn build
+      
+      - name: Deploy
+        env:
+            AWS_S3_BUCKET: ${{secrets.AWS_S3_BUCKET}}
+            AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
+            AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+            SOURCE_DIR: dist
+        run: |
+          aws s3 cp \
+            --recursive \
+            --region ap-northeast-2 \
+            $SOURCE_DIR s3://$AWS_S3_BUCKET
+            
